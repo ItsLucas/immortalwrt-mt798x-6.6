@@ -1,0 +1,6 @@
+config sfp 'config'
+	option enabled '1'
+	option mode 'auto'
+	option dfp_34x_2c2_2500basex '0'
+	option serdes_2500basex_no_nway '0'
+	option dfp_34x_2c2_ignore_tx_fault '0'

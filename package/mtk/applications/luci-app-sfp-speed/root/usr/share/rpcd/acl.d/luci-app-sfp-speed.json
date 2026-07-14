@@ -1,0 +1,14 @@
+{
+	"luci-app-sfp-speed": {
+		"description": "Grant access to SFP speed control",
+		"read": {
+			"ubus": {
+				"luci.sfp_speed": [ "getStatus" ]
+			},
+			"uci": [ "sfp-speed" ]
+		},
+		"write": {
+			"uci": [ "sfp-speed" ]
+		}
+	}
+}

@@ -1,0 +1,126 @@
+--- a/src/rtl837x_common.h
++++ b/src/rtl837x_common.h
+@@ -124,6 +124,9 @@
+ 
+ extern int rtl8372n_hw_init(struct rtk_gsw *gsw, rtl837x_pnswap_cfg_t swap_cfg);
+ 
++extern rtk_api_ret_t rtl837x_sds_mode_set(rtk_uint32 sds_index,
++					  rtk_sds_mode_t mode);
++
+ extern int rtl837x_debug_proc_init(struct rtk_gsw *gsw);
+ extern int rtl837x_debug_proc_deinit(struct rtk_gsw *gsw);
+ 
+--- a/src/rtl837x_mdio.c
++++ b/src/rtl837x_mdio.c
+@@ -20,9 +20,28 @@
+ #include <net/rtnetlink.h>
+ 
+ #include "./rtl837x_common.h"
++#include <dal/rtl8373/dal_rtl8373_switch.h>
+ 
+ #include <linux/printk.h>
+ 
++static bool serdes_2500basex_no_nway;
++module_param(serdes_2500basex_no_nway, bool, 0644);
++MODULE_PARM_DESC(serdes_2500basex_no_nway,
++		 "Disable NWay for SERDES_2500BASEX when the mode is applied");
++
++rtk_api_ret_t rtl837x_sds_mode_set(rtk_uint32 sds_index,
++				    rtk_sds_mode_t mode)
++{
++	rtk_api_ret_t ret;
++
++	ret = rtk_sdsMode_set(sds_index, mode);
++	if (ret == RT_ERR_OK && mode == SERDES_2500BASEX &&
++	    READ_ONCE(serdes_2500basex_no_nway))
++		sds_nway_set(sds_index, mode, DISABLED);
++
++	return ret;
++}
++
+ const uint8_t rtl8373_port_map[16] = {
+     0, 1, 2, 3, 4, 5, 6, 7, 8, // 物理端口0-8
+     0, 0, 0, 0, 0, 0, 0        // 填充
+@@ -477,14 +496,14 @@
+ 		}
+ 	}
+ 
+-	ret = rtk_sdsMode_set(0, SERDES_10GR);
++	ret = rtl837x_sds_mode_set(0, SERDES_10GR);
+ 	if (ret) return -EPERM;
+-	ret = rtk_sdsMode_set(0, gsw->sds0mode);
++	ret = rtl837x_sds_mode_set(0, gsw->sds0mode);
+ 	if (ret) return -EPERM;
+ 
+-	ret = rtk_sdsMode_set(1, SERDES_10GR);
++	ret = rtl837x_sds_mode_set(1, SERDES_10GR);
+ 	if (ret) return -EPERM;
+-	ret = rtk_sdsMode_set(1, gsw->sds1mode);
++	ret = rtl837x_sds_mode_set(1, gsw->sds1mode);
+ 	if (ret) return -EPERM;
+ 
+ 	ret = rtk_cpu_externalCpuPort_set(PORT_MAPPED(gsw->cpu_port));
+@@ -534,13 +553,13 @@
+ 		rtnl_lock();
+ 		dev_close(gsw->ethernet_master);
+ 		rtnl_unlock();
+-		rtk_sdsMode_set(0, SERDES_OFF);
++		rtl837x_sds_mode_set(0, SERDES_OFF);
+ 		mdelay(200);
+ 
+ 		rtnl_lock();
+ 		dev_open(gsw->ethernet_master, NULL);
+ 		rtnl_unlock();
+-		rtk_sdsMode_set(0, gsw->sds0mode);
++		rtl837x_sds_mode_set(0, gsw->sds0mode);
+ 
+ 		mdelay(2000);
+ 	}
+@@ -643,7 +662,7 @@
+ 	}
+ 
+ 	gsw->sfp_present = true;
+-	rtk_sdsMode_set(1, gsw->sds1mode);
++	rtl837x_sds_mode_set(1, gsw->sds1mode);
+ 	
+ 	queue_delayed_work_on(smp_processor_id(), 
+ 					system_wq, 
+@@ -660,7 +679,7 @@
+ 	dev_info(gsw->dev, "SFP module remove\n");
+ 
+ 	USE_SERDESMODE(1, SERDES_OFF);
+-	rtk_sdsMode_set(1, gsw->sds1mode);
++	rtl837x_sds_mode_set(1, gsw->sds1mode);
+ }
+ 
+ static const struct sfp_upstream_ops sfp_ops = {
+--- a/src/rtl837x_swconfig.c
++++ b/src/rtl837x_swconfig.c
+@@ -468,11 +468,11 @@
+ 	rtk_sds_mode_t mode = (val->value.i != 0) ? gsw->sds1mode : gsw->sds0mode;
+ 	dev_info(gsw->dev, "Reset Serdes%d, mode: %x\n", val->value.i, mode);
+ 
+-	if (rtk_sdsMode_set(val->value.i, SERDES_OFF))
++	if (rtl837x_sds_mode_set(val->value.i, SERDES_OFF))
+ 		return -EPERM;
+ 	mdelay(20);
+ 
+-	if (rtk_sdsMode_set(val->value.i, mode))
++	if (rtl837x_sds_mode_set(val->value.i, mode))
+ 		return -EPERM;
+ 	mdelay(20);
+ 
+@@ -540,11 +540,11 @@
+ 			return -EINVAL;
+ 	}
+ 
+-	if (rtk_sdsMode_set(sds_index, SERDES_OFF))
++	if (rtl837x_sds_mode_set(sds_index, SERDES_OFF))
+ 		return -EPERM;
+ 	mdelay(20);
+ 
+-	if (rtk_sdsMode_set(sds_index, mode))
++	if (rtl837x_sds_mode_set(sds_index, mode))
+ 		return -EPERM;
+ 	mdelay(20);
+ 	return 0;

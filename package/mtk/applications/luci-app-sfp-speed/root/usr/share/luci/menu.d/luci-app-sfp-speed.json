@@ -1,0 +1,14 @@
+{
+	"admin/network/sfp-speed": {
+		"title": "SFP Speed",
+		"order": 85,
+		"action": {
+			"type": "view",
+			"path": "sfp-speed"
+		},
+		"depends": {
+			"acl": [ "luci-app-sfp-speed" ],
+			"uci": { "sfp-speed": true }
+		}
+	}
+}

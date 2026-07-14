@@ -1,0 +1,115 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-sfp-speed\n"
+"PO-Revision-Date: 2026-07-14 00:00+0800\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: Chinese Simplified\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+
+msgid "SFP Speed"
+msgstr "SFP 速率"
+
+msgid "SFP Speed Control"
+msgstr "SFP 速率控制"
+
+msgid "Configuration"
+msgstr "配置"
+
+msgid "Controls the TL-7DR7299 external SFP+ cage on RTL837x SerDes1. Saving and applying briefly interrupts the SFP link. Automatic mode releases the driver override."
+msgstr "控制 TL-7DR7299 外置 SFP+ 插槽所连接的 RTL837x SerDes1。保存并应用时 SFP 链路会短暂中断；自动模式会解除驱动强制设置。"
+
+msgid "Enable persistent control"
+msgstr "启用持久化控制"
+
+msgid "When disabled, the service writes value 1 to release the force setting. Reinsert the module or reboot to resume EEPROM-based automatic selection."
+msgstr "禁用后，服务会写入数值 1 解除强制设置。请重新拔插模块或重启，以恢复基于 EEPROM 的自动选择。"
+
+msgid "Host SerDes mode"
+msgstr "主机端 SerDes 模式"
+
+msgid "Automatic / release force (1)"
+msgstr "自动／解除强制（1）"
+
+msgid "100 Mbit/s - 100BASE-FX (5)"
+msgstr "100 Mbit/s - 100BASE-FX（5）"
+
+msgid "1 Gbit/s - 1000BASE-X (4)"
+msgstr "1 Gbit/s - 1000BASE-X（4）"
+
+msgid "2.5 Gbit/s - 2500BASE-X (22 / 0x16)"
+msgstr "2.5 Gbit/s - 2500BASE-X（22 / 0x16）"
+
+msgid "10 Gbit/s - 10GBASE-R (26 / 0x1a)"
+msgstr "10 Gbit/s - 10GBASE-R（26 / 0x1a）"
+
+msgid "For ODI DFP-34X-2C2 configured internally for 2.5G, select 2500BASE-X. 100BASE-FX is optical 100M mode, not generic 100BASE-T. After returning to Automatic, reinsert the module or reboot so its EEPROM is parsed again."
+msgstr "对于内部已配置为 2.5G 的 ODI DFP-34X-2C2，请选择 2500BASE-X。100BASE-FX 是光纤 100M 模式，不是通用的 100BASE-T。恢复自动模式后请重新拔插模块或重启，使系统重新解析其 EEPROM。"
+
+msgid "Runtime status"
+msgstr "运行状态"
+
+msgid "The RTL837x serdes1_force_mode attribute is unavailable. No runtime change will be attempted."
+msgstr "RTL837x 的 serdes1_force_mode 属性不可用；不会尝试进行任何运行时修改。"
+
+msgid "Driver force state:"
+msgstr "驱动强制状态："
+
+msgid "Driver SerDes modes:"
+msgstr "驱动 SerDes 模式："
+
+msgid "SFP port 5 link:"
+msgstr "SFP 端口 5 链路："
+
+msgid "Automatic (1)"
+msgstr "自动（1）"
+
+msgid "100BASE-FX (5)"
+msgstr "100BASE-FX（5）"
+
+msgid "1000BASE-X (4)"
+msgstr "1000BASE-X（4）"
+
+msgid "2500BASE-X (22 / 0x16)"
+msgstr "2500BASE-X（22 / 0x16）"
+
+msgid "10GBASE-R (26 / 0x1a)"
+msgstr "10GBASE-R（26 / 0x1a）"
+
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Enabled"
+msgstr "已启用"
+
+msgid "Disabled"
+msgstr "已禁用"
+
+msgid "DFP 2.5G capability quirk"
+msgstr "DFP 2.5G 能力修正"
+
+msgid "DFP ignore TX_FAULT quirk"
+msgstr "DFP 忽略 TX_FAULT 修正"
+
+msgid "RTL837x 2.5G no-NWay"
+msgstr "RTL837x 2.5G 禁用 NWay"
+
+msgid "DFP-34X-2C2: advertise 2500BASE-X"
+msgstr "DFP-34X-2C2：宣告 2500BASE-X"
+
+msgid "Experimental SFP core quirk. Reinsert the PON stick after changing it so Linux reparses the EEPROM capabilities."
+msgstr "实验性 SFP 核心修正。更改后请重新拔插 PON 棒，使 Linux 重新解析 EEPROM 能力。"
+
+msgid "DFP-34X-2C2: ignore TX_FAULT"
+msgstr "DFP-34X-2C2：忽略 TX_FAULT"
+
+msgid "Lower-probability diagnostic for modules with a stuck TX_FAULT signal. Reinsert the PON stick after changing it."
+msgstr "用于诊断 TX_FAULT 信号卡住这一较低概率问题。更改后请重新拔插 PON 棒。"
+
+msgid "RTL837x: disable NWay for 2500BASE-X"
+msgstr "RTL837x：为 2500BASE-X 禁用 NWay"
+
+msgid "Experimental RTL837x diagnostic. It takes effect when forced 2500BASE-X is reapplied by Save & Apply."
+msgstr "实验性 RTL837x 诊断开关。点击“保存并应用”重新强制 2500BASE-X 时生效。"

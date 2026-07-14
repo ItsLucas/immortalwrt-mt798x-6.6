@@ -1,0 +1,194 @@
+#!/bin/sh
+
+# TL-7DR7299 wiring: the external SFP+ cage is RTL837x SerDes1 / switch port 5.
+SWITCH_DEVICE="switch0"
+SFP_PORT="5"
+LOG_TAG="sfp-speed"
+SFP_2500_QUIRK="/sys/module/sfp/parameters/dfp_34x_2c2_2500basex"
+SFP_IGNORE_TX_FAULT="/sys/module/sfp/parameters/dfp_34x_2c2_ignore_tx_fault"
+RTL_NO_NWAY="/sys/module/rtl837x_gsw/parameters/serdes_2500basex_no_nway"
+
+configured_enabled() {
+	local enabled
+
+	enabled="$(uci -q get sfp-speed.config.enabled)"
+	case "$enabled" in
+		0|false|no|off) echo 0 ;;
+		*) echo 1 ;;
+	esac
+}
+
+configured_mode() {
+	local mode
+
+	mode="$(uci -q get sfp-speed.config.mode)"
+	case "$mode" in
+		auto|100base-fx|1000base-x|2500base-x|10gbase-r)
+			echo "$mode"
+			;;
+		*)
+			echo "auto"
+			;;
+	esac
+}
+
+mode_value() {
+	case "$1" in
+		auto)       echo 1 ;;
+		100base-fx) echo 5 ;;
+		1000base-x) echo 4 ;;
+		2500base-x) echo 22 ;;
+		10gbase-r)  echo 26 ;;
+		*) return 1 ;;
+	esac
+}
+
+configured_bool() {
+	local value
+
+	value="$(uci -q get "sfp-speed.config.$1")"
+	case "$value" in
+		1|true|yes|on) echo 1 ;;
+		*) echo 0 ;;
+	esac
+}
+
+apply_parameter() {
+	local path option description value
+
+	path="$1"
+	option="$2"
+	description="$3"
+	value="$(configured_bool "$option")"
+
+	if [ ! -w "$path" ]; then
+		logger -t "$LOG_TAG" \
+			"$description parameter is unavailable or read-only at $path; no change made"
+		return 0
+	fi
+
+	if printf '%s\n' "$value" > "$path"; then
+		logger -t "$LOG_TAG" "$description parameter set to $value"
+		return 0
+	fi
+
+	logger -t "$LOG_TAG" "Failed to set $description parameter to $value"
+	return 0
+}
+
+apply_kernel_parameters() {
+	apply_parameter "$SFP_2500_QUIRK" \
+		"dfp_34x_2c2_2500basex" "DFP-34X-2C2 2500BASE-X quirk"
+	apply_parameter "$RTL_NO_NWAY" \
+		"serdes_2500basex_no_nway" "RTL837x 2500BASE-X no-NWay"
+	apply_parameter "$SFP_IGNORE_TX_FAULT" \
+		"dfp_34x_2c2_ignore_tx_fault" "DFP-34X-2C2 ignore TX_FAULT quirk"
+}
+
+has_force_attribute() {
+	command -v swconfig >/dev/null 2>&1 || return 1
+	swconfig dev "$SWITCH_DEVICE" help 2>&1 |
+		grep -Fq 'serdes1_force_mode'
+}
+
+apply_mode() {
+	local enabled mode value
+
+	enabled="$(configured_enabled)"
+	mode="$(configured_mode)"
+	[ "$enabled" = "1" ] || mode="auto"
+	value="$(mode_value "$mode")" || return 1
+
+	# Parameters must be committed before reprogramming SerDes1. In particular,
+	# the RTL no-NWay parameter is consumed while 2500BASE-X is being set.
+	apply_kernel_parameters
+
+	if ! has_force_attribute; then
+		logger -t "$LOG_TAG" \
+			"RTL837x serdes1_force_mode is unavailable on $SWITCH_DEVICE; no change made"
+		return 0
+	fi
+
+	if swconfig dev "$SWITCH_DEVICE" set serdes1_force_mode "$value" >/dev/null 2>&1; then
+		logger -t "$LOG_TAG" \
+			"Set SerDes1 to $mode (force value $value)"
+		return 0
+	fi
+
+	logger -t "$LOG_TAG" \
+		"Failed to set SerDes1 to $mode (force value $value)"
+	return 1
+}
+
+status_json() {
+	local enabled mode value available force_mode serdes_mode link_state
+	local sfp_2500_available sfp_2500_value sfp_tx_fault_available sfp_tx_fault_value
+	local rtl_no_nway_available rtl_no_nway_value
+
+	. /usr/share/libubox/jshn.sh
+
+	enabled="$(configured_enabled)"
+	mode="$(configured_mode)"
+	value="$(mode_value "$mode")"
+	available=0
+	force_mode=""
+	serdes_mode=""
+	link_state=""
+	sfp_2500_available=0
+	sfp_2500_value=""
+	sfp_tx_fault_available=0
+	sfp_tx_fault_value=""
+	rtl_no_nway_available=0
+	rtl_no_nway_value=""
+
+	if has_force_attribute; then
+		available=1
+		force_mode="$(swconfig dev "$SWITCH_DEVICE" get serdes1_force_mode 2>/dev/null)"
+		serdes_mode="$(swconfig dev "$SWITCH_DEVICE" get serdes_mode_get 2>/dev/null)"
+		link_state="$(swconfig dev "$SWITCH_DEVICE" port "$SFP_PORT" get link 2>/dev/null)"
+	fi
+
+	if [ -r "$SFP_2500_QUIRK" ]; then
+		sfp_2500_available=1
+		sfp_2500_value="$(cat "$SFP_2500_QUIRK" 2>/dev/null)"
+	fi
+	if [ -r "$SFP_IGNORE_TX_FAULT" ]; then
+		sfp_tx_fault_available=1
+		sfp_tx_fault_value="$(cat "$SFP_IGNORE_TX_FAULT" 2>/dev/null)"
+	fi
+	if [ -r "$RTL_NO_NWAY" ]; then
+		rtl_no_nway_available=1
+		rtl_no_nway_value="$(cat "$RTL_NO_NWAY" 2>/dev/null)"
+	fi
+
+	json_init
+	json_add_boolean available "$available"
+	json_add_boolean enabled "$enabled"
+	json_add_string switch_device "$SWITCH_DEVICE"
+	json_add_int sfp_port "$SFP_PORT"
+	json_add_string configured_mode "$mode"
+	json_add_int configured_value "$value"
+	json_add_string force_mode "$force_mode"
+	json_add_string serdes_mode "$serdes_mode"
+	json_add_string link_state "$link_state"
+	json_add_boolean dfp_34x_2c2_2500basex_available "$sfp_2500_available"
+	json_add_string dfp_34x_2c2_2500basex_value "$sfp_2500_value"
+	json_add_boolean dfp_34x_2c2_ignore_tx_fault_available "$sfp_tx_fault_available"
+	json_add_string dfp_34x_2c2_ignore_tx_fault_value "$sfp_tx_fault_value"
+	json_add_boolean serdes_2500basex_no_nway_available "$rtl_no_nway_available"
+	json_add_string serdes_2500basex_no_nway_value "$rtl_no_nway_value"
+	json_dump
+}
+
+case "$1" in
+	apply)
+		apply_mode
+		;;
+	status-json)
+		status_json
+		;;
+	*)
+		echo "Usage: $0 {apply|status-json}" >&2
+		exit 1
+		;;
+esac

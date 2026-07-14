@@ -1,0 +1,91 @@
+From 4765f1119d83fb7b1586370a64ba3392fb18c9a3 Mon Sep 17 00:00:00 2001
+From: ItsLucas <itslucas@itslucas.me>
+Date: Tue, 14 Jul 2026 12:00:00 +0800
+Subject: [PATCH] net: phy: sfp: add runtime ODI DFP-34X-2C2 quirks
+
+Some ODI DFP-34X-2C2 GPON modules can be configured for a 2500BASE-X
+host interface while their EEPROM still only advertises 1000BASE-X.
+The same module model can also be configured for a 1000BASE-X host,
+so an unconditional model quirk would be unsafe.
+
+Add disabled-by-default module parameters which make the existing
+2500BASE-X and TX_FAULT quirks conditional for ODI and OEM branded
+DFP-34X-2C2 modules. Parameter changes deliberately take effect on the
+next module insertion, when the EEPROM is parsed and fixups are applied.
+
+Do not ignore LOS: there is no evidence that the module's LOS signal is
+broken, and masking it would hide useful link state.
+
+Signed-off-by: ItsLucas <itslucas@itslucas.me>
+---
+ drivers/net/phy/sfp.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
+@@ -18,6 +18,21 @@
+ #include "sfp.h"
+ #include "swphy.h"
+ 
++static bool dfp_34x_2c2_2500basex;
++module_param(dfp_34x_2c2_2500basex, bool, 0644);
++MODULE_PARM_DESC(dfp_34x_2c2_2500basex,
++		 "Add 2500BASE-X support for ODI/OEM DFP-34X-2C2 on next insertion");
++
++static bool dfp_34x_2c2_ignore_tx_fault;
++module_param(dfp_34x_2c2_ignore_tx_fault, bool, 0644);
++MODULE_PARM_DESC(dfp_34x_2c2_ignore_tx_fault,
++		 "Ignore TX_FAULT for ODI/OEM DFP-34X-2C2 on next insertion");
++
++/* These parameters are intentionally sampled only while a module is being
++ * inserted. Reinsert the module after changing either value so that phylink
++ * is configured from a consistent set of capabilities and fixups.
++ */
++
+ enum {
+ 	GPIO_MODDEF0,
+ 	GPIO_LOS,
+@@ -443,6 +458,23 @@ static void sfp_quirk_2500basex(const s
+ 	__set_bit(PHY_INTERFACE_MODE_2500BASEX, interfaces);
+ }
+ 
++static void sfp_quirk_dfp_34x_2c2(const struct sfp_eeprom_id *id,
++				  unsigned long *modes,
++				  unsigned long *interfaces)
++{
++	if (READ_ONCE(dfp_34x_2c2_2500basex))
++		sfp_quirk_2500basex(id, modes, interfaces);
++}
++
++static void sfp_fixup_dfp_34x_2c2(struct sfp *sfp)
++{
++	if (READ_ONCE(dfp_34x_2c2_ignore_tx_fault)) {
++		sfp_fixup_ignore_tx_fault(sfp);
++		dev_info(sfp->dev,
++			 "ignoring TX_FAULT for DFP-34X-2C2 until removal\n");
++	}
++}
++
+ static void sfp_quirk_disable_autoneg(const struct sfp_eeprom_id *id,
+ 				      unsigned long *modes,
+ 				      unsigned long *interfaces)
+@@ -518,6 +550,17 @@ static const struct sfp_quirk sfp_quirk
+ 	// OEM SFP-GE-T is 1000Base-T module
+ 	SFP_QUIRK_F("OEM", "SFP-GE-T", sfp_fixup_ignore_tx_fault),
+ 
++	/* ODI DFP-34X-2C2 modules configured for a 2.5G host interface may
++	 * advertise only 1000BASE-X in EEPROM. OEM is used by some revisions.
++	 * Keep both workarounds runtime-selectable because this model can also
++	 * be configured for a 1G host interface and TX_FAULT is not universally
++	 * known to be broken.
++	 */
++	SFP_QUIRK("ODI", "DFP-34X-2C2", sfp_quirk_dfp_34x_2c2,
++		  sfp_fixup_dfp_34x_2c2),
++	SFP_QUIRK("OEM", "DFP-34X-2C2", sfp_quirk_dfp_34x_2c2,
++		  sfp_fixup_dfp_34x_2c2),
++
+ 	// Lantech 8330-262D-E can operate at 2500base-X, but incorrectly report
+ 	// 2500MBd NRZ in their EEPROM
+ 	SFP_QUIRK_M("Lantech", "8330-262D-E", sfp_quirk_2500basex),
+-- 
+2.50.1

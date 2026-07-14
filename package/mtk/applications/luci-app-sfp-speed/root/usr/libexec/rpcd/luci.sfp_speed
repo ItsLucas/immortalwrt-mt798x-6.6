@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case "$1" in
+	list)
+		echo '{"getStatus":{}}'
+		;;
+	call)
+		case "$2" in
+			getStatus)
+				exec /usr/sbin/sfp-speed-control status-json
+				;;
+		esac
+		;;
+esac
