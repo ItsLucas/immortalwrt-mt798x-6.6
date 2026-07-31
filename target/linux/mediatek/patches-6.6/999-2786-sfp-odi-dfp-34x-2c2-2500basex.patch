@@ -1,0 +1,48 @@
+From: ItsLucas <itslucas@itslucas.me>
+Date: Fri, 31 Jul 2026 00:00:00 +0000
+Subject: [PATCH 6.6] net: phy: sfp: support 2500base-X on ODI DFP-34X-2C2
+
+The ODI DFP-34X-2C2 GPON stick is electrically capable of running its
+host-side interface at 2500BASE-X, but its EEPROM does not advertise
+that mode, so the SFP layer only offers 1000BASE-X to the MAC/switch.
+
+Verified on a TP-Link TL-7DR7299 v1 (MT7988 + RTL8372N, SFP on SerDes1 /
+switch port 5) with an ODI DFP-34X-2C2 HW V2.0, FW V1.1.8-240408 in GPON
+mode:
+
+  - On hot-plug the kernel reads a stable identity ("ODI" /
+    "DFP-34X-2C2"), reports
+    "sfp: support mode 00,00000000,00000200,00006040", and the RTL837x
+    driver logs "1000base-x SFP module inserted". Port 5 links at
+    1000 Mbps full duplex and PPPoE over the ISP VLAN comes up.
+  - Forcing only the switch SerDes mode with
+    "swconfig dev switch0 set serdes1_force_mode 22" (SerDes1 -> 0x16)
+    on the exact same hardware, module, optics, VLAN and PPPoE
+    configuration yields a stable 2500 Mbps full duplex link, and PPPoE
+    reconnects successfully.
+
+So the link, the board routing and the module all support 2.5G; the only
+defect is the advertised host-side mode set. LOS and TX_FAULT behave
+correctly (LOS low, TX_DISABLE output low at link up), and the module is
+accepted by the RTL837x driver, so no alarm-suppression or forced-mode
+bypass fixup is warranted. A modes-only quirk is therefore the minimal
+correct fix.
+
+Signed-off-by: ItsLucas <itslucas@itslucas.me>
+---
+ drivers/net/phy/sfp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
+@@ -616,6 +616,10 @@ static const struct sfp_quirk sfp_quirks
+ 	SFP_QUIRK("Lantech", "8330-265D", sfp_quirk_2500basex,
+ 		  sfp_fixup_ignore_los),
+ 
++	// ODI DFP-34X-2C2 can operate at 2500base-X, but does not advertise
++	// that host-side mode in its EEPROM.
++	SFP_QUIRK_M("ODI", "DFP-34X-2C2", sfp_quirk_2500basex),
++
+ 	SFP_QUIRK_M("UBNT", "UF-INSTANT", sfp_quirk_ubnt_uf_instant),
+ 
+ 	// Walsun HXSX-ATR[CI]-1 don't identify as copper, and use the
